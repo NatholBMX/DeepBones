@@ -29,8 +29,24 @@ static PxPhysics* gPhysicsSDK = NULL;
 //Creating instance of PhysX SDK
 gPhysicsSDK = PxCreatePhysics
 (PX_PHYSICS_VERSION, *gFoundation, PxTolerancesScale());
+
 if (gPhysicsSDK == NULL)
 {
 	cerr << "Error creating PhysX3 device, Exiting..." << endl;
 	exit(1);
 }
+
+PxScene* gScene = NULL;
+//Creating scene
+PxSceneDesc sceneDesc(gPhysicsSDK->getTolerancesScale());
+
+sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
+sceneDesc.cpuDispatcher = PxDefaultCpuDispatcherCreate(1);
+sceneDesc.filterShader = PxDefaultSimulationFilterShader;
+
+gScene = gPhysicsSDK->createScene(sceneDesc);
+
+//Creating material
+PxMaterial* mMaterial =
+//static friction, dynamic friction, restitution
+gPhysicsSDK->createMaterial(0.5, 0.5, 0.5);
