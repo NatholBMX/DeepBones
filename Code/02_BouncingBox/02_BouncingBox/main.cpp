@@ -142,8 +142,57 @@ void StepPhysX()
 // Delete PhysX objects
 void ShutdownPhysX()
 {
+	gScene->removeActor(*box);
+	gScene->release();
+	box->release();
 	gPhysicsSDK->release();
 }
+
+void ResetPerspectiveProjection()
+{
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+}
+
+// support function for getting global position
+void getColumnMajor(PxMat33 m, PxVec3 t, float* mat) {
+	mat[0] = m.column0[0];
+	mat[1] = m.column0[1];
+	mat[2] = m.column0[2];
+	mat[3] = 0;
+
+	mat[4] = m.column1[0];
+	mat[5] = m.column1[1];
+	mat[6] = m.column1[2];
+	mat[7] = 0;
+
+	mat[8] = m.column2[0];
+	mat[9] = m.column2[1];
+	mat[10] = m.column2[2];
+	mat[11] = 0;
+
+	mat[12] = t[0];
+	mat[13] = t[1];
+	mat[14] = t[2];
+	mat[15] = 1;
+}
+
+// Drawp a box in GLUT
+void DrawBox(PxShape* pShape)
+{
+	PxTransform pT = PxShapeExt::getGlobalPose(*pShape, *box);
+	PxBoxGeometry bg;
+	pShape->getBoxGeometry(bg);
+	PxMat33 m = PxMat33(pT.q);
+	float mat[16];
+	getColumnMajor(m, pT.p, mat);
+	glPushMatrix();
+	glMultMatrixf(mat);
+	glutSolidCube(bg.halfExtents.x * 2);
+	glPopMatrix();
+}
+
 
 // Draw the shape
 void DrawShape(PxShape* shape)
@@ -180,30 +229,60 @@ void RenderActors()
 	DrawActor(box);
 }
 
-// Drawp a box in GLUT
-void DrawBox(PxShape* pShape)
-{
-	PxTransform pT = PxShapeExt::getGlobalPose(*pShape);
-	PxBoxGeometry bg;
-	pShape->getBoxGeometry(bg);
-	PxMat33 m = PxMat33(pT.q);
-	float mat[16];
-	getColumnMajor(m, pT.p, mat);
-	glPushMatrix();
-	glMultMatrixf(mat);
-	glutSolidCube(bg.halfExtents.x * 2);
-	glPopMatrix();
+void InitGL() {
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+
+	GLfloat ambient[4] = { 0.25f, 0.25f, 0.25f, 0.25f };
+	GLfloat diffuse[4] = { 1, 1, 1, 1 };
+	GLfloat mat_diffuse[4] = { 0.85f, 0, 0, 0 };
+
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+	glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, mat_diffuse);
+
+	glDisable(GL_LIGHTING);
 }
 
+
+char buffer[MAX_PATH];
 // Rendering function for GLUT
 void OnRender()
 {
+	//Calculate fps
+	totalFrames++;
+	int current = glutGet(GLUT_ELAPSED_TIME);
+	if ((current - startTime)>1000)
+	{
+		float elapsedTime = float(current - startTime);
+		fps = ((totalFrames * 1000.0f) / elapsedTime);
+		startTime = current;
+		totalFrames = 0;
+	}
+
+	sprintf_s(buffer, "FPS: %3.2f", fps);
+
+
 	// clear buffer
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	//reset matrix
 	glLoadIdentity();
 
+	//Update PhysX 
+	if (gScene)
+	{
+		StepPhysX();
+	}	
+
+	// Set the camera
+	gluLookAt(0.0f, 0.0f, 20.0f,
+		0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f);
+
+	RenderActors();
+	ResetPerspectiveProjection();
 	glutSwapBuffers();
 }
 
@@ -226,28 +305,13 @@ void OnReshape(int nw, int nh)
 	glMatrixMode(GL_MODELVIEW);
 }
 
-// support function for getting global position
-void getColumnMajor(PxMat33 m, PxVec3 t, float* mat) {
-	mat[0] = m.column0[0];
-	mat[1] = m.column0[1];
-	mat[2] = m.column0[2];
-	mat[3] = 0;
-
-	mat[4] = m.column1[0];
-	mat[5] = m.column1[1];
-	mat[6] = m.column1[2];
-	mat[7] = 0;
-
-	mat[8] = m.column2[0];
-	mat[9] = m.column2[1];
-	mat[10] = m.column2[2];
-	mat[11] = 0;
-
-	mat[12] = t[0];
-	mat[13] = t[1];
-	mat[14] = t[2];
-	mat[15] = 1;
+// Idle function
+void OnIdle()
+{
+	glutPostRedisplay();
 }
+
+
 
 int main(int argc, char **argv) {
 	// C++ own at-exit function
@@ -262,6 +326,12 @@ int main(int argc, char **argv) {
 	// register callbacks
 	glutDisplayFunc(OnRender);
 	glutReshapeFunc(OnReshape);
+	glutIdleFunc(OnIdle);
+
+	//InitGL();
+
+	// Initialize PhysX
+	InitializePhysX();
 
 	// enter GLUT event processing cycle
 	glutMainLoop();
