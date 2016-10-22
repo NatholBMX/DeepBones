@@ -1,0 +1,13 @@
+-Unreal Engine:
+	-Recreate falling box
+	-Create simple multi-joint object
+	-Player-control object
+	-Find and learn API for controlling
+	
+-Machine Learning:
+	-Coursera course
+	
+-Redo QWOP with with Machine Learning
+	-Choose programming language
+	-QWOP API
+	-Machine learning library for programming language
